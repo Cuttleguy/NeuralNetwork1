@@ -4,7 +4,9 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
+import torch.optim as optim
 from torchvision import transforms,datasets
+
 train = datasets.MNIST("",train=True,download=True,
                        transform=transforms.Compose([transforms.ToTensor()]))
 
@@ -39,9 +41,18 @@ class Net(nn.Module):
         self.fc3 = nn.Linear(64, 64)
         self.fc4 = nn.Linear(64, 10)
     def forward(self,x):
-        pass
-    # Continue at 9:05 in video 3
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
+        x = self.fc4(x)
+        return F.log_softmax(x,dim=1)
+
 
 
 net=Net()
 print(net)
+X = torch.rand([28,28])
+X = X.view([-1,28*28])
+output=net(X)
+print(output)
+optimizer=optim.Adam(net.parameters(),lr=0.001)
