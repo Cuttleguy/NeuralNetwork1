@@ -7,8 +7,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+if(torch.cuda.is_available()):
+
+    device = torch.device("cuda:0")
+else:
+    device= torch.device("cpu")
 REBUILD_DATA = False
-print(torch.cuda.is_available())
+
 class DogsVSCats():
     IMG_SIZE = 50
     CATS = "PetImages/Cat"
@@ -79,13 +84,13 @@ class Net(nn.Module):
         return F.softmax(x,dim=1)
 
 
-net=Net()
+net=Net().to(device)
 print(net)
 optimizer= optim.Adam(net.parameters(),lr=0.001)
 loss_function=nn.MSELoss()
-X = torch.Tensor([i[0] for i in training_data]).view(-1,50,50)
+X = torch.Tensor([i[0] for i in training_data]).view(-1,50,50).to(device)
 X = X/255.0
-y = torch.Tensor([i[1] for i in training_data])
+y = torch.Tensor([i[1] for i in training_data]).to(device)
 VAL_PCT= 0.1
 val_size = int(len(X)*VAL_PCT)
 print(val_size)
@@ -95,28 +100,34 @@ test_X = X[-val_size:]
 test_y = y[-val_size:]
 # print(len(train_X))
 # print(len(test))
-BATCH_SIZE = 100
-EPOCHS = 1
 
-for epoch in range(EPOCHS):
-    for i in tqdm(range(0, len(train_X), BATCH_SIZE)):
-        # print(i,i+BATCH_SIZE)
-        batch_X = train_X[i:i+BATCH_SIZE].view(-1,1,50,50)
-        batch_y = train_y[i:i+BATCH_SIZE]
-        optimizer.zero_grad()
-        outputs= net(batch_X)
-        loss=loss_function(outputs,batch_y)
-        loss.backward()
-        optimizer.step()
-print(loss)
-correct=0
-total=0
-with torch.no_grad():
-    for i in tqdm(range(len(test_X))):
-        real_class=torch.argmax(test_y[i])
-        net_out=net(test_X[i].view(-1,1,50,50))[0]
-        predicted_class=torch.argmax(net_out)
-        if predicted_class == real_class:
-            correct+=1
-        total+=1
-print("Accuracy: ", round(correct/total,3))
+def train(net):
+    BATCH_SIZE = 100
+    EPOCHS = 17
+    for epoch in range(EPOCHS):
+
+        for i in tqdm(range(0, len(train_X), BATCH_SIZE)):
+            # print(i,i+BATCH_SIZE)
+            batch_X = train_X[i:i+BATCH_SIZE].view(-1,1,50,50).to(device)
+            batch_y = train_y[i:i+BATCH_SIZE].to(device)
+            optimizer.zero_grad()
+            outputs= net(batch_X)
+            loss=loss_function(outputs,batch_y)
+            loss.backward()
+            optimizer.step()
+        print(epoch)
+        print(loss)
+def test(net):
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for i in tqdm(range(len(test_X))):
+            real_class=torch.argmax(test_y[i]).to(device)
+            net_out=net(test_X[i].view(-1,1,50,50))[0]
+            predicted_class=torch.argmax(net_out)
+            if predicted_class == real_class:
+                correct+=1
+            total+=1
+    print("Accuracy: ", round(correct/total,3))
+train(net)
+test(net)
