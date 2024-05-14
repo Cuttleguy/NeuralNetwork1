@@ -6,6 +6,7 @@ from torch import nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import torch.optim as optim
+import statistics
 import math
 
 if torch.cuda.is_available():
@@ -143,13 +144,13 @@ loss_function = nn.MSELoss()
 
 def train(net):
     BATCH_SIZE = 100
-    EPOCHS = 1
+    EPOCHS = 3
     for epoch in range(EPOCHS):
 
         for i in tqdm(range(0, len(train_X), BATCH_SIZE)):
             # print(i,i+BATCH_SIZE)
             batch_Xraw = train_X[i:i + BATCH_SIZE]
-            batch_Xlist = list(map(makeBoard,batch_Xraw))
+            batch_Xlist = list(map(makeBoard, batch_Xraw))
             # for batch in batch_Xraw:
             #     batch_Xlist.append(makeBoard(batch))
             # for batch in batch_Xlist:
@@ -159,34 +160,45 @@ def train(net):
             batch_y = train_y[i:i + BATCH_SIZE].to(device).to(torch.float32)
             optimizer.zero_grad()
             outputs = net(batch_X)
-            loss = loss_function(outputs, batch_y.view([len(batch_X),1]))
+            loss = loss_function(outputs, batch_y.view([len(batch_X), 1]))
             loss.backward()
 
             optimizer.step()
         print(epoch)
         print(loss)
-        torch.save(net.state_dict, "models/cnn1.pth")
+        torch.save(net.state_dict(), "cnn1.pth")
+
+
 #
-net.state_dict=torch.load("models/cnn1.pth")
-print(net.parameters())
+#
+print(len(test_X))
+
+
 def test(net):
     correct = 0
     total = 0
+    differences=[]
     with torch.no_grad():
         for i in tqdm(range(len(test_X))):
             real_class = test_y[i]
             # print(test_X[i])
-            batch=torch.Tensor(makeBoard(test_X[i])).to(device)
+            batch = torch.Tensor(makeBoard(test_X[i])).to(device)
 
             net_out = net(batch)
             # predicted_class=torch.argmax(net_out)
-            if abs(net_out - real_class) <= 25:
+
+            # Test Acurracy 1
+            if abs(net_out - real_class).item() <= 50:
                 correct += 1
-            else:
-
-                print(abs(net_out-real_class).item())
+            # else:
+            #
+            #     print(abs(net_out - real_class).item())
+            differences.append(abs(net_out-real_class.item()))
             total += 1
-    print(round(correct/total,3))
+    print(round(correct / total, 3))
+    print(statistics.fmean(differences))
 
-# train(net)
+train(net)
+old_dict=net.state_dict()
+net.load_state_dict(torch.load("cnn1.pth"))
 test(net)
