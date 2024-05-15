@@ -197,8 +197,9 @@ def test(net):
             total += 1
     print(round(correct / total, 3))
     print(statistics.fmean(differences))
-
-train(net)
-old_dict=net.state_dict()
+old_dict = net.state_dict()
 net.load_state_dict(torch.load("cnn1.pth"))
+# train(net)
+
+
 test(net)

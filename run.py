@@ -1,8 +1,9 @@
-
 import chess
 import torch
 from torch import nn
 import torch.nn.functional as F
+
+
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
@@ -65,9 +66,9 @@ def makeBoard(boardData):
         boardBits.append(1)
     charToInt = {"a": 1, "b": 2, "c": 3, "d": 4, "e": 5, "f": 6, "g": 7, "h": 8}
     castlingBits = [0, 0, 0, 0]
-    if ("K" in boardInfo[2]):
+    if "K" in boardInfo[2]:
         castlingBits[0] = 1
-    if ("Q" in boardInfo[2]):
+    if "Q" in boardInfo[2]:
         castlingBits[1] = 1
     if ("k" in boardInfo[2]):
         castlingBits[2] = 1
@@ -85,42 +86,75 @@ def makeBoard(boardData):
     boardBits.append(int(boardInfo[5]))
     # print(len(boardBits))
     return boardBits
+
+
 if torch.cuda.is_available():
 
     device = torch.device("cuda:0")
     print("CUDA")
 else:
     device = torch.device("cpu")
-board=chess.Board()
-net=Net().to(device)
-net.load_state_dict(torch.load("cnn1.pth",device))
+board = chess.Board()
+net = Net().to(device)
+net.load_state_dict(torch.load("cnn1.pth", device))
 print(net)
 
+
 def getInput(board: chess.Board):
-    moveToMake = input("Your Move: ")
-    move=chess.Move.from_uci(moveToMake)
-    if not board.is_legal(move):
-        print("Not Legal")
-        return getInput(board)
-    else:
-        board.push(move)
-while not board.is_checkmate():
+    try:
+        moveToMake = input("Your Move: ")
+        move = chess.Move.from_uci(moveToMake)
+        if not board.is_legal(move):
+            print("Not Legal")
+            return getInput(board)
+        else:
+            board.push(move)
+    except chess.InvalidMoveError as e:
+        print(e)
+        getInput(board)
+
+
+def forsee(board: chess.Board, oldWeight: float):
+    totalEval = 0
+    weight = oldWeight / 1.5
+    if weight < 1 / 1000:
+        return 0
+    moves = []
+    evals = []
+    for move in board.legal_moves:
+        copy = board.copy()
+        copy.push(move)
+        cureval = net(torch.Tensor(makeBoard(copy.fen())).to(device))
+        evals.append(cureval)
+        moves.append(move)
+        totalEval += cureval * weight
+
+    minPos = evals.index(min(evals))
+    moveb = moves[minPos]
+    copy=board.copy()
+    copy.push(moveb)
+    return totalEval+forsee(board,weight)
+
+while not board.is_checkmate() or board.is_stalemate():
     if board.turn:
         getInput(board)
     else:
-        moves=[]
-        evals=[]
+        moves = []
+        evals = []
         for move in board.legal_moves:
             moves.append(move)
-            copy=board.copy()
+            copy = board.copy()
 
             copy.push(move)
-            boardInfo=torch.Tensor(makeBoard(copy.fen())).to(device)
-            net_out=net(boardInfo)
+            if(copy.is_checkmate()):
+                board.push(move)
+                continue
+
+            boardInfo = torch.Tensor(makeBoard(copy.fen())).to(device)
+            net_out = net(boardInfo)
+            net_out += forsee(board, 1)
             evals.append(net_out.item())
-        minPos=evals.index(min(evals))
-        moveb=moves[minPos]
+        minPos = evals.index(min(evals))
+        moveb = moves[minPos]
         board.push(moveb)
         print(moveb.uci())
-
-
